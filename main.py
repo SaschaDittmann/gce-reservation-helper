@@ -1,6 +1,6 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
-import threading
-import time
+from threading import Thread, Event
+from time import sleep
 import os
 
 from google.cloud import compute_v1
@@ -123,7 +123,7 @@ def resize_reservation():
         print("Error resizing reservation")
         print(e)
 
-def reservation_worker():
+def reservation_worker(event: Event) -> None:
     """
     Function that manages the creation and resizing of reservations for virtual machines.
 
@@ -138,17 +138,22 @@ def reservation_worker():
         if (current_vm_count == 0):
             print("Creating new reservation...")
             create_new_reservation()
-            time.sleep(30)
+            sleep(30)
         else:
             if (current_vm_count < target_vm_count):
                 print("Resizing reservation...")
                 resize_reservation()
-                time.sleep(30)
-    print("Target VM Count reached. Exiting...")
+                sleep(30)
+        if event.is_set():
+            print('The thread was stopped prematurely.')
+            break
+    if current_vm_count >= target_vm_count:
+        print("Target VM Count reached. Exiting...")
 
 if __name__ == '__main__':
     print("Starting reservation worker...")
-    thread = threading.Thread(target=reservation_worker)
+    thread_stopping_event = Event()
+    thread = Thread(target=reservation_worker, args=(thread_stopping_event,))
     thread.start()
 
     web_server = HTTPServer((host_name, server_port), InfoWebServer)
@@ -160,4 +165,9 @@ if __name__ == '__main__':
         pass
 
     web_server.server_close()
-    print("Server stopped.")
+    print("Web Server stopped.")
+
+    print("Reservation Worker stopping...")
+    thread_stopping_event.set()
+    thread.join()
+    print("Reservation Worker stopped.")
