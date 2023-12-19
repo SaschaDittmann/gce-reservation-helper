@@ -92,7 +92,7 @@ def create_new_reservation():
         response = client.insert(request=request)
 
         # Handle the response
-        print(response)
+        print(response.result())
     except Exception as e:
         print("Error creating reservation")
         print(e)
@@ -118,7 +118,7 @@ def resize_reservation():
         response = client.resize(request=request)
 
         # Handle the response
-        print(response)
+        print(response.result())
     except Exception as e:
         print("Error resizing reservation")
         print(e)
