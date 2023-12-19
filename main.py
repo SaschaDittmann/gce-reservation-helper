@@ -1,14 +1,20 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import threading
 import time
+import os
 
 from google.cloud import compute_v1
 
-project_id = "smart-analytics-demos"
-zone = "europe-west4-a"
-reservation_id = "test-reservation"
-target_vm_count = 2
-machine_type = "a2-highgpu-1g"
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
+# Get environment variables
+project_id = os.getenv('PROJECT_ID')
+zone = os.getenv('ZONE')
+reservation_id = os.getenv('RESERVATION_ID')
+target_vm_count = int(os.getenv('TARGET_VM_COUNT'))
+machine_type = os.getenv('MACHINE_TYPE')
 
 client = compute_v1.ReservationsClient()
 current_vm_count = 0
