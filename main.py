@@ -13,14 +13,14 @@ load_dotenv()
 project_id = os.getenv('PROJECT_ID')
 zone = os.getenv('ZONE')
 reservation_id = os.getenv('RESERVATION_ID')
-target_vm_count = int(os.getenv('TARGET_VM_COUNT'))
+target_vm_count = int(os.getenv('TARGET_VM_COUNT', 1))
 machine_type = os.getenv('MACHINE_TYPE')
 
 client = compute_v1.ReservationsClient()
 current_vm_count = 0
 
-host_name = "localhost"
-server_port = 8080
+host_name = os.getenv('HOST_NAME', '0.0.0.0')
+server_port = int(os.getenv('PORT', '8080'))
 
 class InfoWebServer(BaseHTTPRequestHandler):
     def do_GET(self):
