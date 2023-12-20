@@ -9,6 +9,7 @@ ENV PROJECT_ID my-project-id \
     HOST_NAME 0.0.0.0 \
     PORT 8080
 WORKDIR /app
-ADD main.py requirements.txt .
+ADD requirements.txt .
 RUN pip install -r requirements.txt
+ADD main.py .
 CMD ["python", "main.py"]

@@ -1,7 +1,9 @@
+import os
+import json
+import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread, Event
 from time import sleep
-import os
 
 from google.cloud import compute_v1
 
@@ -15,12 +17,12 @@ zone = os.getenv('ZONE')
 reservation_id = os.getenv('RESERVATION_ID')
 target_vm_count = int(os.getenv('TARGET_VM_COUNT', 1))
 machine_type = os.getenv('MACHINE_TYPE')
+host_name = os.getenv('HOST_NAME', '0.0.0.0')
+server_port = int(os.getenv('PORT', '8080'))
 
 client = compute_v1.ReservationsClient()
 current_vm_count = 0
-
-host_name = os.getenv('HOST_NAME', '0.0.0.0')
-server_port = int(os.getenv('PORT', '8080'))
+global_log_fields = {}
 
 class InfoWebServer(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -56,8 +58,7 @@ def get_current_vm_count():
 
         current_vm_count = response.specific_reservation.count
     except Exception as e:
-        print("Error getting current VM count")
-        print(e)
+        log_error("Error getting current VM count: " + str(e))
 
 def create_new_reservation():
     """
@@ -92,10 +93,11 @@ def create_new_reservation():
         response = client.insert(request=request)
 
         # Handle the response
-        print(response)
+        result=response.result()
+        if result is not None:
+            log_error(str(result))
     except Exception as e:
-        print("Error creating reservation")
-        print(e)
+        log_error("Error creating reservation: " + str(e))
     
 def resize_reservation():
     """
@@ -118,10 +120,11 @@ def resize_reservation():
         response = client.resize(request=request)
 
         # Handle the response
-        print(response)
+        result=response.result()
+        if result is not None:
+            log_error(str(result))
     except Exception as e:
-        print("Error resizing reservation")
-        print(e)
+        log_error("Error resizing reservation: " + str(e))
 
 def reservation_worker(event: Event) -> None:
     """
@@ -134,30 +137,66 @@ def reservation_worker(event: Event) -> None:
     """
     while current_vm_count < target_vm_count:
         get_current_vm_count()
-        print("Current VM count: " + str(current_vm_count))
+        log_info("Current VM count: " + str(current_vm_count))
         if (current_vm_count == 0):
-            print("Creating new reservation...")
+            log_info("Creating new reservation...")
             create_new_reservation()
             sleep(30)
         else:
             if (current_vm_count < target_vm_count):
-                print("Resizing reservation...")
+                log_info("Resizing reservation...")
                 resize_reservation()
                 sleep(30)
         if event.is_set():
-            print('The thread was stopped prematurely.')
+            log_info('The thread was stopped prematurely.')
             break
     if current_vm_count >= target_vm_count:
-        print("Target VM Count reached. Exiting...")
+        log_info("Target VM Count reached. Exiting...")
+
+def log_info(message: str) -> None:
+    """
+    Logs an info message to the Google Cloud Logging service.
+
+    Args:
+        message (str): The info message to log.
+
+    Returns:
+        None
+    """
+    entry = dict(
+        severity="INFO",
+        message=message,
+        **global_log_fields,
+    )
+
+    print(json.dumps(entry))
+
+def log_error(message: str) -> None:
+    """
+    Logs an error message to the Google Cloud Logging service.
+
+    Args:
+        message (str): The error message to log.
+
+    Returns:
+        None
+    """
+    entry = dict(
+        severity="ERROR",
+        message=message,
+        **global_log_fields,
+    )
+
+    print(json.dumps(entry), file=sys.stderr)
 
 if __name__ == '__main__':
-    print("Starting reservation worker...")
+    log_info("Starting reservation worker...")
     thread_stopping_event = Event()
     thread = Thread(target=reservation_worker, args=(thread_stopping_event,))
     thread.start()
 
     web_server = HTTPServer((host_name, server_port), InfoWebServer)
-    print("Server started http://%s:%s" % (host_name, server_port))
+    log_info("Server started http://%s:%s" % (host_name, server_port))
 
     try:
         web_server.serve_forever()
@@ -165,9 +204,9 @@ if __name__ == '__main__':
         pass
 
     web_server.server_close()
-    print("Web Server stopped.")
+    log_info("Web Server stopped.")
 
-    print("Reservation Worker stopping...")
+    log_info("Reservation Worker stopping...")
     thread_stopping_event.set()
     thread.join()
-    print("Reservation Worker stopped.")
+    log_info("Reservation Worker stopped.")
