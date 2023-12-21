@@ -48,6 +48,7 @@ def get_current_vm_count():
     """
     try:
         global current_vm_count
+        current_vm_count = 0
 
         request = compute_v1.GetReservationRequest(
             project = project_id,
