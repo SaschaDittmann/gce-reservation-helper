@@ -136,7 +136,7 @@ def reservation_worker(event: Event) -> None:
     If the current count is less than the target count, the reservation is resized.
     The function sleeps for 30 seconds after each operation.
     """
-    while current_vm_count < target_vm_count:
+    while True:
         get_current_vm_count()
         log_info("Current VM count: " + str(current_vm_count))
         if (current_vm_count == 0):
@@ -148,11 +148,12 @@ def reservation_worker(event: Event) -> None:
                 log_info("Resizing reservation...")
                 resize_reservation()
                 sleep(30)
+            else:
+                log_info("Target VM Count reached. Nevertheless, I will continue checking...")
+                sleep(30)
         if event.is_set():
             log_info('The thread was stopped prematurely.')
             break
-    if current_vm_count >= target_vm_count:
-        log_info("Target VM Count reached. Exiting...")
 
 def log_info(message: str) -> None:
     """
